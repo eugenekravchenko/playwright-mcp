@@ -33,13 +33,12 @@ import html from './tools/html.js';
 
 import type { Tool } from './tools/tool.js';
 
-
-
 export const allTools: Tool<any>[] = [
   ...common,
   ...console,
-  ...dialogs(true),
-  ...files(true),
+  ...dialogs,
+  ...evaluate,
+  ...files,
   ...install,
   ...keyboard,
   ...navigate,
@@ -49,6 +48,6 @@ export const allTools: Tool<any>[] = [
   ...screenshot,
   ...snapshot,
   ...tabs,
-  ...html,
   ...wait,
+  ...html,
 ];
