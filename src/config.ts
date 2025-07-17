@@ -15,7 +15,6 @@
  */
 
 import fs from 'fs';
-import net from 'net';
 import os from 'os';
 import path from 'path';
 import { devices } from 'playwright';
@@ -38,7 +37,7 @@ export type CLIOptions = {
   host?: string;
   ignoreHttpsErrors?: boolean;
   isolated?: boolean;
-  imageResponses?: 'allow' | 'omit' | 'auto';
+  imageResponses?: 'allow' | 'omit';
   sandbox: boolean;
   outputDir?: string;
   port?: number;
@@ -49,7 +48,6 @@ export type CLIOptions = {
   userAgent?: string;
   userDataDir?: string;
   viewportSize?: string;
-  vision?: boolean;
 };
 
 const defaultConfig: FullConfig = {
@@ -68,19 +66,21 @@ const defaultConfig: FullConfig = {
     allowedOrigins: undefined,
     blockedOrigins: undefined,
   },
+  server: {},
   outputDir: path.join(os.tmpdir(), 'playwright-mcp-output', sanitizeForFilePath(new Date().toISOString())),
 };
 
 type BrowserUserConfig = NonNullable<Config['browser']>;
 
 export type FullConfig = Config & {
-  browser: BrowserUserConfig & {
-    browserName: NonNullable<BrowserUserConfig['browserName']>;
+  browser: Omit<BrowserUserConfig, 'browserName'> & {
+    browserName: 'chromium' | 'firefox' | 'webkit';
     launchOptions: NonNullable<BrowserUserConfig['launchOptions']>;
     contextOptions: NonNullable<BrowserUserConfig['contextOptions']>;
   },
   network: NonNullable<Config['network']>,
   outputDir: string;
+  server: NonNullable<Config['server']>,
 };
 
 export async function resolveConfig(config: Config): Promise<FullConfig> {
@@ -94,8 +94,6 @@ export async function resolveCLIConfig(cliOptions: CLIOptions): Promise<FullConf
   // Derive artifact output directory from config.outputDir
   if (result.saveTrace)
     result.browser.launchOptions.tracesDir = path.join(result.outputDir, 'traces');
-  if (result.browser.browserName === 'chromium')
-    (result.browser.launchOptions as any).cdpPort = await findFreePort();
   return result;
 }
 
@@ -142,6 +140,9 @@ export async function configFromCLIOptions(cliOptions: CLIOptions): Promise<Conf
       launchOptions.proxy.bypass = cliOptions.proxyBypass;
   }
 
+  if (cliOptions.device && cliOptions.cdpEndpoint)
+    throw new Error('Device emulation is not supported with cdpEndpoint.');
+
   // Context options
   const contextOptions: BrowserContextOptions = cliOptions.device ? devices[cliOptions.device] : {};
   if (cliOptions.storageState)
@@ -181,7 +182,6 @@ export async function configFromCLIOptions(cliOptions: CLIOptions): Promise<Conf
       host: cliOptions.host,
     },
     capabilities: cliOptions.caps?.split(',').map((c: string) => c.trim() as ToolCapability),
-    vision: !!cliOptions.vision,
     network: {
       allowedOrigins: cliOptions.allowedOrigins,
       blockedOrigins: cliOptions.blockedOrigins,
@@ -192,17 +192,6 @@ export async function configFromCLIOptions(cliOptions: CLIOptions): Promise<Conf
   };
 
   return result;
-}
-
-async function findFreePort() {
-  return new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.listen(0, () => {
-      const { port } = server.address() as net.AddressInfo;
-      server.close(() => resolve(port));
-    });
-    server.on('error', reject);
-  });
 }
 
 async function loadConfig(configFile: string | undefined): Promise<Config> {
@@ -230,6 +219,8 @@ function pickDefined<T extends object>(obj: T | undefined): Partial<T> {
 
 function mergeConfig(base: FullConfig, overrides: Config): FullConfig {
   const browser: FullConfig['browser'] = {
+    ...pickDefined(base.browser),
+    ...pickDefined(overrides.browser),
     browserName: overrides.browser?.browserName ?? base.browser?.browserName ?? 'chromium',
     isolated: overrides.browser?.isolated ?? base.browser?.isolated ?? false,
     launchOptions: {
@@ -241,9 +232,6 @@ function mergeConfig(base: FullConfig, overrides: Config): FullConfig {
       ...pickDefined(base.browser?.contextOptions),
       ...pickDefined(overrides.browser?.contextOptions),
     },
-    userDataDir: overrides.browser?.userDataDir ?? base.browser?.userDataDir,
-    cdpEndpoint: overrides.browser?.cdpEndpoint ?? base.browser?.cdpEndpoint,
-    remoteEndpoint: overrides.browser?.remoteEndpoint ?? base.browser?.remoteEndpoint,
   };
 
   if (browser.browserName !== 'chromium' && browser.launchOptions)
@@ -256,6 +244,10 @@ function mergeConfig(base: FullConfig, overrides: Config): FullConfig {
     network: {
       ...pickDefined(base.network),
       ...pickDefined(overrides.network),
-    }
+    },
+    server: {
+      ...pickDefined(base.server),
+      ...pickDefined(overrides.server),
+    },
   } as FullConfig;
 }

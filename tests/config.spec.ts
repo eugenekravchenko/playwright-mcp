@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import { Config } from '../config.js';
 import { test, expect } from './fixtures.js';
 
-test('config user data dir', async ({ startClient, server }, testInfo) => {
+test('config user data dir', async ({ startClient, server, mcpMode }, testInfo) => {
   server.setContent('/', `
     <title>Title</title>
     <body>Hello, world!</body>
@@ -33,7 +33,7 @@ test('config user data dir', async ({ startClient, server }, testInfo) => {
   const configPath = testInfo.outputPath('config.json');
   await fs.promises.writeFile(configPath, JSON.stringify(config, null, 2));
 
-  const client = await startClient({ args: ['--config', configPath] });
+  const { client } = await startClient({ args: ['--config', configPath] });
   expect(await client.callTool({
     name: 'browser_navigate',
     arguments: { url: server.PREFIX },
@@ -45,7 +45,7 @@ test('config user data dir', async ({ startClient, server }, testInfo) => {
 
 test.describe(() => {
   test.use({ mcpBrowser: '' });
-  test('browserName', { annotation: { type: 'issue', description: 'https://github.com/microsoft/playwright-mcp/issues/458' } }, async ({ startClient }, testInfo) => {
+  test('browserName', { annotation: { type: 'issue', description: 'https://github.com/microsoft/playwright-mcp/issues/458' } }, async ({ startClient, mcpMode }, testInfo) => {
     const config: Config = {
       browser: {
         browserName: 'firefox',
@@ -54,7 +54,7 @@ test.describe(() => {
     const configPath = testInfo.outputPath('config.json');
     await fs.promises.writeFile(configPath, JSON.stringify(config, null, 2));
 
-    const client = await startClient({ args: ['--config', configPath] });
+    const { client } = await startClient({ args: ['--config', configPath] });
     expect(await client.callTool({
       name: 'browser_navigate',
       arguments: { url: 'data:text/html,<script>document.title = navigator.userAgent</script>' },

@@ -16,29 +16,36 @@
 
 import { test, expect } from './fixtures.js';
 
-test('stitched aria frames', async ({ client }) => {
+test('browser_evaluate', async ({ client, server }) => {
   expect(await client.callTool({
     name: 'browser_navigate',
+    arguments: { url: server.HELLO_WORLD },
+  })).toContainTextContent(`- Page Title: Title`);
+
+  const result = await client.callTool({
+    name: 'browser_evaluate',
     arguments: {
-      url: `data:text/html,<h1>Hello</h1><iframe src="data:text/html,<button>World</button><main><iframe src='data:text/html,<p>Nested</p>'></iframe></main>"></iframe><iframe src="data:text/html,<h1>Should be invisible</h1>" style="display: none;"></iframe>`,
+      function: '() => document.title',
     },
-  })).toContainTextContent(`
-\`\`\`yaml
-- generic [active] [ref=e1]:
-  - heading "Hello" [level=1] [ref=e2]
-  - iframe [ref=e3]:
-    - generic [active] [ref=f1e1]:
-      - button "World" [ref=f1e2]
-      - main [ref=f1e3]:
-        - iframe [ref=f1e4]:
-          - paragraph [ref=f2e2]: Nested
-\`\`\``);
+  });
+  expect(result).toContainTextContent(`"Title"`);
+});
+
+test('browser_evaluate (element)', async ({ client, server }) => {
+  server.setContent('/', `
+    <body style="background-color: red">Hello, world!</body>
+  `, 'text/html');
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
 
   expect(await client.callTool({
-    name: 'browser_click',
+    name: 'browser_evaluate',
     arguments: {
-      element: 'World',
-      ref: 'f1e2',
+      function: 'element => element.style.backgroundColor',
+      element: 'body',
+      ref: 'e1',
     },
-  })).toContainTextContent(`// Click World`);
+  })).toContainTextContent(`- Result: "red"`);
 });

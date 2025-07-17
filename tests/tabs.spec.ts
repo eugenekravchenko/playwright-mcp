@@ -31,7 +31,7 @@ test('list initial tabs', async ({ client }) => {
   expect(await client.callTool({
     name: 'browser_tab_list',
   })).toHaveTextContent(`### Open tabs
-- 1: (current) [] (about:blank)`);
+- 0: (current) [] (about:blank)`);
 });
 
 test('list first tab', async ({ client }) => {
@@ -39,8 +39,8 @@ test('list first tab', async ({ client }) => {
   expect(await client.callTool({
     name: 'browser_tab_list',
   })).toHaveTextContent(`### Open tabs
-- 1: [] (about:blank)
-- 2: (current) [Tab one] (data:text/html,<title>Tab one</title><body>Body one</body>)`);
+- 0: [] (about:blank)
+- 1: (current) [Tab one] (data:text/html,<title>Tab one</title><body>Body one</body>)`);
 });
 
 test('create new tab', async ({ client }) => {
@@ -51,15 +51,15 @@ test('create new tab', async ({ client }) => {
 \`\`\`
 
 ### Open tabs
-- 1: [] (about:blank)
-- 2: (current) [Tab one] (data:text/html,<title>Tab one</title><body>Body one</body>)
+- 0: [] (about:blank)
+- 1: (current) [Tab one] (data:text/html,<title>Tab one</title><body>Body one</body>)
 
 ### Current tab
 - Page URL: data:text/html,<title>Tab one</title><body>Body one</body>
 - Page Title: Tab one
 - Page Snapshot
 \`\`\`yaml
-- generic [ref=e1]: Body one
+- generic [active] [ref=e1]: Body one
 \`\`\``);
 
   expect(await createTab(client, 'Tab two', 'Body two')).toHaveTextContent(`
@@ -69,16 +69,16 @@ test('create new tab', async ({ client }) => {
 \`\`\`
 
 ### Open tabs
-- 1: [] (about:blank)
-- 2: [Tab one] (data:text/html,<title>Tab one</title><body>Body one</body>)
-- 3: (current) [Tab two] (data:text/html,<title>Tab two</title><body>Body two</body>)
+- 0: [] (about:blank)
+- 1: [Tab one] (data:text/html,<title>Tab one</title><body>Body one</body>)
+- 2: (current) [Tab two] (data:text/html,<title>Tab two</title><body>Body two</body>)
 
 ### Current tab
 - Page URL: data:text/html,<title>Tab two</title><body>Body two</body>
 - Page Title: Tab two
 - Page Snapshot
 \`\`\`yaml
-- generic [ref=e1]: Body two
+- generic [active] [ref=e1]: Body two
 \`\`\``);
 });
 
@@ -88,25 +88,25 @@ test('select tab', async ({ client }) => {
   expect(await client.callTool({
     name: 'browser_tab_select',
     arguments: {
-      index: 2,
+      index: 1,
     },
   })).toHaveTextContent(`
 - Ran Playwright code:
 \`\`\`js
-// <internal code to select tab 2>
+// <internal code to select tab 1>
 \`\`\`
 
 ### Open tabs
-- 1: [] (about:blank)
-- 2: (current) [Tab one] (data:text/html,<title>Tab one</title><body>Body one</body>)
-- 3: [Tab two] (data:text/html,<title>Tab two</title><body>Body two</body>)
+- 0: [] (about:blank)
+- 1: (current) [Tab one] (data:text/html,<title>Tab one</title><body>Body one</body>)
+- 2: [Tab two] (data:text/html,<title>Tab two</title><body>Body two</body>)
 
 ### Current tab
 - Page URL: data:text/html,<title>Tab one</title><body>Body one</body>
 - Page Title: Tab one
 - Page Snapshot
 \`\`\`yaml
-- generic [ref=e1]: Body one
+- generic [active] [ref=e1]: Body one
 \`\`\``);
 });
 
@@ -116,24 +116,24 @@ test('close tab', async ({ client }) => {
   expect(await client.callTool({
     name: 'browser_tab_close',
     arguments: {
-      index: 3,
+      index: 2,
     },
   })).toHaveTextContent(`
 - Ran Playwright code:
 \`\`\`js
-// <internal code to close tab 3>
+// <internal code to close tab 2>
 \`\`\`
 
 ### Open tabs
-- 1: [] (about:blank)
-- 2: (current) [Tab one] (data:text/html,<title>Tab one</title><body>Body one</body>)
+- 0: [] (about:blank)
+- 1: (current) [Tab one] (data:text/html,<title>Tab one</title><body>Body one</body>)
 
 ### Current tab
 - Page URL: data:text/html,<title>Tab one</title><body>Body one</body>
 - Page Title: Tab one
 - Page Snapshot
 \`\`\`yaml
-- generic [ref=e1]: Body one
+- generic [active] [ref=e1]: Body one
 \`\`\``);
 });
 
@@ -141,7 +141,7 @@ test('reuse first tab when navigating', async ({ startClient, cdpServer, server 
   const browserContext = await cdpServer.start();
   const pages = browserContext.pages();
 
-  const client = await startClient({ args: [`--cdp-endpoint=${cdpServer.endpoint}`] });
+  const { client } = await startClient({ args: [`--cdp-endpoint=${cdpServer.endpoint}`] });
   await client.callTool({
     name: 'browser_navigate',
     arguments: { url: server.HELLO_WORLD },

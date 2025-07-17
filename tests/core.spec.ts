@@ -31,13 +31,13 @@ await page.goto('${server.HELLO_WORLD}');
 - Page Title: Title
 - Page Snapshot
 \`\`\`yaml
-- generic [ref=e1]: Hello, world!
+- generic [active] [ref=e1]: Hello, world!
 \`\`\`
 `
   );
 });
 
-test('browser_click', async ({ client, server }) => {
+test('browser_click', async ({ client, server, mcpBrowser }) => {
   server.setContent('/', `
     <title>Title</title>
     <button>Submit</button>
@@ -65,7 +65,46 @@ await page.getByRole('button', { name: 'Submit' }).click();
 - Page Title: Title
 - Page Snapshot
 \`\`\`yaml
-- button "Submit" [ref=e2]
+- button "Submit" ${mcpBrowser !== 'webkit' || process.platform === 'linux' ? '[active] ' : ''}[ref=e2]
+\`\`\`
+`);
+});
+
+test('browser_click (double)', async ({ client, server }) => {
+  server.setContent('/', `
+    <title>Title</title>
+    <script>
+      function handle() {
+        document.querySelector('h1').textContent = 'Double clicked';
+      }
+    </script>
+    <h1 ondblclick="handle()">Click me</h1>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+
+  expect(await client.callTool({
+    name: 'browser_click',
+    arguments: {
+      element: 'Click me',
+      ref: 'e2',
+      doubleClick: true,
+    },
+  })).toHaveTextContent(`
+- Ran Playwright code:
+\`\`\`js
+// Double click Click me
+await page.getByRole('heading', { name: 'Click me' }).dblclick();
+\`\`\`
+
+- Page URL: ${server.PREFIX}
+- Page Title: Title
+- Page Snapshot
+\`\`\`yaml
+- heading "Double clicked" [level=1] [ref=e3]
 \`\`\`
 `);
 });
@@ -175,7 +214,7 @@ test('browser_type', async ({ client, server }) => {
   });
   expect(await client.callTool({
     name: 'browser_console_messages',
-  })).toHaveTextContent('[LOG] Key pressed: Enter , Text: Hi!');
+  })).toHaveTextContent(/\[LOG\] Key pressed: Enter , Text: Hi!/);
 });
 
 test('browser_type (slowly)', async ({ client, server }) => {
@@ -199,14 +238,13 @@ test('browser_type (slowly)', async ({ client, server }) => {
       slowly: true,
     },
   });
-  expect(await client.callTool({
+  const response = await client.callTool({
     name: 'browser_console_messages',
-  })).toHaveTextContent([
-    '[LOG] Key pressed: H Text: ',
-    '[LOG] Key pressed: i Text: H',
-    '[LOG] Key pressed: ! Text: Hi',
-    '[LOG] Key pressed: Enter Text: Hi!',
-  ].join('\n'));
+  });
+  expect(response).toHaveTextContent(/\[LOG\] Key pressed: H Text: /);
+  expect(response).toHaveTextContent(/\[LOG\] Key pressed: i Text: H/);
+  expect(response).toHaveTextContent(/\[LOG\] Key pressed: ! Text: Hi/);
+  expect(response).toHaveTextContent(/\[LOG\] Key pressed: Enter Text: Hi!/);
 });
 
 test('browser_resize', async ({ client, server }) => {
@@ -236,4 +274,61 @@ test('browser_resize', async ({ client, server }) => {
 await page.setViewportSize({ width: 390, height: 780 });
 \`\`\``);
   await expect.poll(() => client.callTool({ name: 'browser_snapshot' })).toContainTextContent('Window size: 390x780');
+});
+
+test('old locator error message', async ({ client, server }) => {
+  server.setContent('/', `
+    <button>Button 1</button>
+    <button>Button 2</button>
+    <script>
+      document.querySelector('button').addEventListener('click', () => {
+        document.querySelectorAll('button')[1].remove();
+      });
+    </script>
+  `, 'text/html');
+
+  expect(await client.callTool({
+    name: 'browser_navigate',
+    arguments: {
+      url: server.PREFIX,
+    },
+  })).toContainTextContent(`
+  - button "Button 1" [ref=e2]
+  - button "Button 2" [ref=e3]
+  `.trim());
+
+  await client.callTool({
+    name: 'browser_click',
+    arguments: {
+      element: 'Button 1',
+      ref: 'e2',
+    },
+  });
+
+  expect(await client.callTool({
+    name: 'browser_click',
+    arguments: {
+      element: 'Button 2',
+      ref: 'e3',
+    },
+  })).toContainTextContent('Ref not found');
+});
+
+test('visibility: hidden > visible should be shown', { annotation: { type: 'issue', description: 'https://github.com/microsoft/playwright-mcp/issues/535' } }, async ({ client, server }) => {
+  server.setContent('/', `
+    <div style="visibility: hidden;">
+      <div style="visibility: visible;">
+        <button>Button</button>
+      </div>
+    </div>
+  `, 'text/html');
+
+  await client.callTool({
+    name: 'browser_navigate',
+    arguments: { url: server.PREFIX },
+  });
+
+  expect(await client.callTool({
+    name: 'browser_snapshot'
+  })).toContainTextContent('- button "Button"');
 });

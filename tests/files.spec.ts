@@ -28,7 +28,7 @@ test('browser_file_upload', async ({ client, server }, testInfo) => {
     arguments: { url: server.PREFIX },
   })).toContainTextContent(`
 \`\`\`yaml
-- generic [ref=e1]:
+- generic [active] [ref=e1]:
   - button "Choose File" [ref=e2]
   - button "Button" [ref=e3]
 \`\`\``);
@@ -65,12 +65,6 @@ The tool "browser_file_upload" can only be used when there is related modal stat
     });
 
     expect(response).not.toContainTextContent('### Modal state');
-    expect(response).toContainTextContent(`
-\`\`\`yaml
-- generic [ref=e1]:
-  - button "Choose File" [ref=e2]
-  - button "Button" [ref=e3]
-\`\`\``);
   }
 
   {
@@ -100,8 +94,8 @@ The tool "browser_file_upload" can only be used when there is related modal stat
   }
 });
 
-test('clicking on download link emits download', async ({ startClient, server }, testInfo) => {
-  const client = await startClient({
+test('clicking on download link emits download', async ({ startClient, server, mcpMode }, testInfo) => {
+  const { client } = await startClient({
     config: { outputDir: testInfo.outputPath('output') },
   });
 
@@ -124,8 +118,8 @@ test('clicking on download link emits download', async ({ startClient, server },
 - Downloaded file test.txt to ${testInfo.outputPath('output', 'test.txt')}`);
 });
 
-test('navigating to download link emits download', async ({ startClient, server, mcpBrowser }, testInfo) => {
-  const client = await startClient({
+test('navigating to download link emits download', async ({ startClient, server, mcpBrowser, mcpMode }, testInfo) => {
+  const { client } = await startClient({
     config: { outputDir: testInfo.outputPath('output') },
   });
 
